@@ -1,0 +1,12 @@
+---
+CompileFlags:
+  Add: [ -xc, -Wall, -Wextra, -DUSE_BIOS_VSYNC, -Wno-empty-translation-unit,  -pedantic, -I../include, -I/opt/devkitpro/devkitARM/arm-none-eabi/include ]
+  Compiler: arm-none-eabi-gcc
+---
+If:
+  PathMatch: [.*\.hpp, .*\.cpp, .*\.cc ]
+
+CompileFlags:
+  Add: [ -xc++, -Wall, -Wextra, -DUSE_BIOS_VSYNC, -Wnoempty-translation-unit, -pedantic, -I../include, -I/opt/devkitpro/devkitARM/arm-none-eabi/include ]
+  Compiler: arm-none-eabi-g++
+---
