@@ -6,9 +6,17 @@
 #include "rng.h"
 #include "save_interface.h"
 #include "wordle_letters.h"
+#include "words.h"
+#include "answers.h"
 #include <string.h>
-#include <sys/unistd.h>
 
+
+
+#ifdef TEST_BMP_MODE
+#define TILE_OFS 512
+#else
+#define TILE_OFS 0
+#endif
 
 #ifdef TEST_TXT_IO
 
@@ -23,16 +31,27 @@ int main(void) {
 }
 
 #else
-const char *KBD_LAYOUT = "qwertyuiopasdfghjklzxcvbnm";
 
-
+static const char KBD_LAYOUT[] = "qwertyuiopasdfghjklzxcvbnm";
+static u8 KBD_LOCATIONS[26];
 static const int KBD_ROW_LENS[3] = {10,9,7};
+
+static Obj_Attrs_t obj_buf[128];
+static Obj_Attrs_t *attempt_buf[6];
+
 
 typedef struct {
   Obj_Attrs_t *keys;
   const char *letters[3];
-  u32 cur_row, cur_col, cur_letter;
+  i32 cur_row, cur_col;
+  i16 cur_letter, buf_cursor, cur_letter_prev_palbank;
+  char buf[6];
 } Keyboard_Ctx_t;
+
+typedef struct {
+  const char *word;
+  u32 won;
+} ALIGN(4) GameOutcome_t;
 
 
 void enable_interrupts(void) {
@@ -86,28 +105,42 @@ void init_board(Obj_Attrs_t *objs) {
               * Set aligned to top so as to leave room for keyboard */ 
   for (int i = 0; i < 6; ++i) {
     x = x_ofs_init;
+    attempt_buf[i] = objs+cur;
     for (int j = 0; j < 5; ++j) {
       objs[cur].attr0.attrs.y=y;
       objs[cur].attr1.attrs_reg.x=x;
-
+#ifndef TEST_BMP_MODE
+      objs[cur].attr2.raw = (1<<10)|TILE_OFS;
       objs[cur+30].attr0.raw = 0x0200|y;  // set hide flag and y pos.
-      objs[cur+++30].attr1.attrs_reg.x=x;
+      objs[cur+30].attr1.attrs_reg.x=x;
+      objs[cur+++30].attr2.raw = TILE_OFS;
+#else
+      objs[cur++].attr2.raw = TILE_OFS;
+#endif
+
       x+=9;
     }
     y+=9;
   }
+#ifdef TEST_BMP_MODE
+  oam_cpy(OAM_MEM, objs, 30);
+#else
   oam_cpy(OAM_MEM, objs, 60);
+#endif
 }
 
 
-
+#define KEY_HOVER_PALBANK 4
+#define KEY_NEUTRAL_PALBANK 0
 
 
 void init_kbd(Keyboard_Ctx_t *kbd) {
   Obj_Attrs_t *objs = kbd->keys;
-  int row_len, cur=0;
+  int row_len, cur=0, c;
   int x, y = 80;
   const char *row_layout = KBD_LAYOUT;
+  memset(kbd->buf, 0, sizeof(kbd->buf));
+  kbd->buf_cursor=0;
   for (int row=0; row < 3; ++row) {
     row_len = KBD_ROW_LENS[row];
     kbd->letters[row] = row_layout;
@@ -115,7 +148,9 @@ void init_kbd(Keyboard_Ctx_t *kbd) {
     for (int i = 0; i < row_len; ++i) {
       objs[cur].attr0.attrs.y=y;
       objs[cur].attr1.attrs_reg.x=x;
-      objs[cur++].attr2.attr.tile_idx = (row_layout[i] - 'a')+1;
+      objs[cur].attr2.attr.tile_idx = TILE_OFS + 1 + (c=row_layout[i] - 'a');
+      KBD_LOCATIONS[c] = cur++;
+
       x+=9;
     }
     y+=9;
@@ -128,38 +163,12 @@ void init_kbd(Keyboard_Ctx_t *kbd) {
 
 }
 
-Obj_Attrs_t obj_buf[128];
-
-void pause_game(void) {
-  fast_memset32(VRAM_BUF, 0, SCREEN_WIDTH*SCREEN_HEIGHT/2  /* unit conversion: (SCR_W*SCR_H) pixels / 2 pixels / word */);
-  REG_DISPLAY_CNT = 0x0403;
-  int pause_tally;
-  SRAM_Read(&pause_tally, sizeof(int), 0);
-  if (pause_tally < 0) {
-    pause_tally=1;
-    SRAM_Write(&pause_tally, sizeof(int), 0);
-  } else {
-    ++pause_tally;
-    SRAM_Write(&pause_tally, sizeof(int), 0);
-  }
-
-  mode3_printf(0, 0, 0x8000, "pause count: %d", pause_tally);
-  
-
-  while ((REG_KEY_STAT&KEY_START))
-    vsync();
-
-  do vsync(); while (!(REG_KEY_STAT&KEY_START));
-
-  REG_DISPLAY_CNT = 0x1000;
-  memcpy(&TILE_MEM[4][0], WordleLettersTiles, WordleLettersTilesLen);
-}
 
 
 void StartScreen(void) {
   REG_DISPLAY_CNT = 0x0403;
   
- // mode3_printf((240-30*4)/2, 16, 0x8000, "A Burt \"Lin\" Sumner Production");
+  mode3_printf((240-30*4)/2, 16, 0x8000, "A Burt \"Lin\" Sumner Production");
   mode3_printf((240-18*4)/2, 48, 0x8000, "Wordle Boy Advance");
   vsync();
 
@@ -185,19 +194,194 @@ void StartScreen(void) {
   
   LFSR_Init((((~rand_seed)<<16)&0xFFFF0000)|(0x0000FFFF&rand_seed), (u32[FEEDBACK_POLY_DEGREE]){23, 22, 21, 16});
   fast_memset32(VRAM_BUF, 0, SCREEN_WIDTH*SCREEN_HEIGHT/2);
-  while (!(REG_KEY_STAT&KEY_START)) vsync(); 
+  while (!(Poll_Keys()&KEY_START)) vsync();
+}
+
+#define K_EV_ENTER_LETTER_FAIL   512
+#define K_EV_DELETE_LETTER_FAIL  256
+#define K_EV_ENTER_WORD_FAIL     128 
+#define K_EV_ENTER_LETTER        64
+#define K_EV_DELETE_LETTER       32
+#define K_EV_MOVE_CURSOR_DOWN    16
+#define K_EV_MOVE_CURSOR_UP      8
+#define K_EV_MOVE_CURSOR_RIGHT   4
+#define K_EV_MOVE_CURSOR_LEFT    2
+#define K_EV_ENTER_WORD          1
+#define K_EV_NO_EVENTS           0
+
+int word_diff(const char *worda, const char *wordb) {
+  int diff;
+  for (int i = 0; i < 5; ++i)
+    if ((diff=worda[i]-wordb[i]))
+      return diff;
+  return 0;
+}
+
+
+bool recurse_search_wordlist(const char *word, const char **list, int len) {
+  if (len < 2) {
+    if (!len) {
+      return 0;
+    }
+    return !strcmp(word, list[0]);
+  }
+
+  const int midpt = len>>1;
+
+
+  int diff;
+  diff = word_diff(word, list[midpt]);
+  if (!diff) {
+    return 1;
+  } else if (diff > 0) {
+    return recurse_search_wordlist(word, &list[midpt+1], len-midpt-1);
+  } else {
+    return recurse_search_wordlist(word, list, midpt);
+  }
+
+}
+
+#define SEARCH_WORDLIST(word) recurse_search_wordlist(word, WORDS, WORD_LIST_LEN)
+
+
+
+
+
+int handle_kbd_events(Keyboard_Ctx_t *kbd) {
+  Obj_Attrs_t *keys = kbd->keys;
+  int cur_col, cur_row, new_col, new_row, tmp, ret=0, buf_cursor=kbd->buf_cursor;
+  cur_col = new_col = kbd->cur_col, cur_row = new_row = kbd->cur_row;
+  if (K_STROKE(START)) {
+    if (buf_cursor!=5) {
+      return K_EV_ENTER_WORD_FAIL;
+    } else if (!SEARCH_WORDLIST(kbd->buf)) {
+      LFSR_Adjust_State(*((int*)(kbd->buf)));
+      return K_EV_ENTER_WORD_FAIL;
+    }
+    LFSR_Adjust_State(*((int*)(kbd->buf)));
+    return K_EV_ENTER_WORD;
+  }
+  if (K_STROKE(UP)) {
+    if (0 > --new_row) {
+      new_row = 2;
+    }
+
+    ret = K_EV_MOVE_CURSOR_UP;
+
+  } else if (K_STROKE(DOWN)) {
+    if (2 < ++new_row) {
+      new_row = 0;
+    }
+    ret=K_EV_MOVE_CURSOR_DOWN;
+  }
+  
+  if (ret) {
+    if ((tmp=KBD_ROW_LENS[new_row]-1) < new_col) {
+      new_col=tmp;
+    }
+  } else {   
+    if (K_STROKE(LEFT)) {
+      if (0 > --new_col) {
+        new_col = KBD_ROW_LENS[new_row]-1;
+      }
+      ret = K_EV_MOVE_CURSOR_LEFT;
+    } else if (K_STROKE(RIGHT)) {
+      if ((KBD_ROW_LENS[new_row]-1) < ++new_col) {
+        new_col = 0;
+      }
+      ret = K_EV_MOVE_CURSOR_RIGHT;
+    }
+  }
+  if (ret) {
+    // shameless hack. This could be way less spaghettified
+    if (!((K_EV_MOVE_CURSOR_LEFT|K_EV_MOVE_CURSOR_RIGHT)&ret)) {
+      if (new_row&2) {
+        if (new_col==(KBD_ROW_LENS[2]-1)) {
+          if (cur_col==6) {
+            --new_col;
+          }
+        } else {
+          if (0 > --new_col) {
+            new_col = 0;
+          }
+        }
+      } else if (ret&K_EV_MOVE_CURSOR_UP) {
+        if (new_row&1) {
+          ++new_col;
+        }
+      } else {
+        if (!new_row) {
+          ++new_col;
+        }
+      }
+    }
+    tmp=0;
+    for (int i = 0; i < cur_row; ++i)
+      tmp += KBD_ROW_LENS[i];
+    tmp+=cur_col;
+    keys[tmp].attr2.attr.palbank = kbd->cur_letter_prev_palbank;
+    oam_cpy(OAM_MEM + 60 + tmp, keys + tmp, 1);
+    tmp = 0;
+    for (int i = 0; i < new_row; ++i)
+      tmp+=KBD_ROW_LENS[i];
+    tmp+=new_col;
+    kbd->cur_letter_prev_palbank = keys[tmp].attr2.attr.palbank;
+    keys[tmp].attr2.attr.palbank = KEY_HOVER_PALBANK;
+    oam_cpy(OAM_MEM + 60 + tmp, keys + tmp, 1);
+    kbd->cur_row = new_row;
+    kbd->cur_col = new_col;
+    kbd->cur_letter = tmp = kbd->letters[new_row][new_col];
+    tmp |= tmp<<8;
+    tmp ^= tmp<<12;
+    tmp ^= tmp<<16;
+    LFSR_Adjust_State(tmp);
+    return ret;
+  }
+
+  if (K_STROKE(A)) {
+    if (5 <= buf_cursor) {
+      return K_EV_ENTER_LETTER_FAIL;
+    }
+    kbd->buf[kbd->buf_cursor++] = kbd->cur_letter;
+    return K_EV_ENTER_LETTER;
+
+  } else if (K_STROKE(B)) {
+    if (0 > --buf_cursor) {
+      return K_EV_DELETE_LETTER_FAIL;
+    }
+    kbd->buf[kbd->buf_cursor=buf_cursor] = 0;
+    return K_EV_DELETE_LETTER;
+  }
+
+
+
+
+
+
+
+  
+
+  return K_EV_NO_EVENTS;
+
+
   
 }
 
 
 void MainMenu(SaveProfile_t *profile);
-int main(void) {
-#if 1
-  enable_interrupts();
-  StartScreen();
-  SaveProfile_t prof;
-  MainMenu(&prof);
+
+GameOutcome_t PlayGame(SaveProfile_t *profile) {
+  char alpha_hashtable[28];
+  const char *word = NULL;
+  Obj_Attrs_t *obj_ofs, *curr_tile, *key;
+  u16 ev_fields, attempt=0;
+  bool won = 0;
+  char c;
+#ifdef TEST_BMP_MODE
+  fast_memcpy32(&TILE_MEM[5][0], WordleLettersTiles, WordleLettersTilesLen/4);
+#else
   fast_memcpy32(&TILE_MEM[4][0], WordleLettersTiles, WordleLettersTilesLen/4);
+#endif
   fast_memcpy32(PAL_OBJ_MEM, WordleLettersPal, WordleLettersPalLen/4);
   
   init_board(obj_buf);
@@ -207,40 +391,219 @@ int main(void) {
 
   init_kbd(&kbd);
   oam_init_ofs(&obj_buf[86], 128-86, 86);
+
+#ifdef TEST_BMP_MODE
+  REG_DISPLAY_CNT = 0x1403;
+  BMP_Rect_t erase_rect = {.x = (SCREEN_WIDTH-30*4)/2, .y=4, .width = 30*4, .height = 8, .color = 0 };
+  int message_erase_timer;
+#else
   REG_DISPLAY_CNT = 0x1000;
- 
-  while (1) {
-    if (!(REG_KEY_STAT&KEY_START)) {
-      do vsync(); while (!(REG_KEY_STAT&KEY_START));
-      pause_game();
-    }
+#endif
+  while (!won && attempt < 6) {
     vsync();
+    Poll_Keys();
+    if ((ev_fields = handle_kbd_events(&kbd))!=K_EV_NO_EVENTS) {
+      do {
+        // poor man's try catch lol
+        if (ev_fields&(K_EV_DELETE_LETTER_FAIL|K_EV_ENTER_LETTER_FAIL|K_EV_ENTER_WORD_FAIL)) {
+#ifdef TEST_BMP_MODE
+          if (ev_fields&K_EV_ENTER_WORD_FAIL) {
+            message_erase_timer = 60;
+            if (kbd.buf_cursor!=5) {
+              mode3_printf((SCREEN_WIDTH-28*4)/2, 4, 0x10A5, "Word must be 5 letters long!");
+            } else {
+              mode3_printf(erase_rect.x, 4, 0x1085, "\"%s\" not found in database!", kbd.buf);
+            }
+            do {
+              vsync();
+              Poll_Keys();
+            } while (--message_erase_timer && !K_STROKE(A));
+            mode3_draw_rect(&erase_rect);
+          }
+#endif
+
+          break;
+        }
+        if (ev_fields&K_EV_ENTER_LETTER) {
+          (*(obj_ofs = &attempt_buf[attempt][kbd.buf_cursor-1])).attr2.attr.tile_idx = TILE_OFS + 1 + kbd.cur_letter - 'a';
+          oam_cpy(OAM_MEM + (obj_ofs-obj_buf), obj_ofs, 1);
+          break;
+        }
+        if (ev_fields&K_EV_DELETE_LETTER) {
+          (*(obj_ofs = &attempt_buf[attempt][kbd.buf_cursor])).attr2.attr.tile_idx = TILE_OFS + 0;
+          oam_cpy(OAM_MEM+(obj_ofs-obj_buf), obj_ofs, 1);
+          break;
+        } 
+        if (ev_fields&K_EV_ENTER_WORD) {
+#ifdef TEST_BMP_MODE
+          obj_ofs = curr_tile = attempt_buf[attempt];
+#else
+          obj_ofs = curr_tile = obj_buf + 30 + attempt*5;
+#endif
+          won=1;
+          if (NULL==word) {
+            word = ANSWERS[LFSR_Rand()%ANSWER_LIST_LEN];
+          }
+
+            fast_memset32(alpha_hashtable, 0, (sizeof(alpha_hashtable)/sizeof(i32)));
+            for (int i = 0; i < 5; ++i) {
+              ++alpha_hashtable[word[i]-'a'];
+           }
+
+          // shameless hack to make sure that duplicates dont get highlighted yellow.
+          // e.g.: if word is "BLAST", and you guess "TOAST", it wont erroneously highlight
+          //       the first T yellow and the second T green, as it should only behave this way if the word 
+          //       does indeed have two T's in it.
+          for (int i = 0; i < 5; ++i) {
+            if (kbd.buf[i] == word[i])
+              --alpha_hashtable[c-'a'];
+          }
+
+          for (int i = 0; i < 5; ++i, ++curr_tile) {
+            c=kbd.buf[i];
+            curr_tile->attr2.attr.tile_idx = TILE_OFS + 1+c-'a';
+            key = &kbd.keys[KBD_LOCATIONS[c-'a']];
+            curr_tile->attr0.attrs.obj_mode = 0;
+            if (c!=word[i]) {
+              won = 0;
+              if (0 < alpha_hashtable[c-'a']) {
+                --alpha_hashtable[c-'a'];
+                curr_tile->attr2.attr.palbank = 2;
+                if (c == kbd.cur_letter) {
+                  if (kbd.cur_letter_prev_palbank != 1)
+                    kbd.cur_letter_prev_palbank = 2;
+                } else {
+                  if (key->attr2.attr.palbank!=1)
+                    key->attr2.attr.palbank=2;
+                }
+                continue;
+              }
+              curr_tile->attr2.attr.palbank = 3;
+              if (c == kbd.cur_letter) {
+                if (!(kbd.cur_letter_prev_palbank&3))
+                  kbd.cur_letter_prev_palbank = 3;
+              } else {
+                if (!(key->attr2.attr.palbank&3)) {
+                  key->attr2.attr.palbank = 3;
+                }
+              }
+              continue;
+            }
+            --alpha_hashtable[c-'a'];
+            curr_tile->attr2.attr.palbank = 1;
+            if (c == kbd.cur_letter) {
+              kbd.cur_letter_prev_palbank = 1;
+            } else {
+              key->attr2.attr.palbank = 1;
+            }
+          }
+          curr_tile = OAM_MEM + (obj_ofs-obj_buf);
+          for (int i = 0; i < 5; ++i) {
+            c=15;
+            do vsync(); while (--c);
+            oam_cpy(curr_tile++, obj_ofs++, 1);
+          }
+          oam_cpy(OAM_MEM+60, kbd.keys, 26);
+          memset(kbd.buf, 0, sizeof(kbd.buf));
+          kbd.buf_cursor = 0;
+          if (won) {
+            ++profile->win_ct;
+            ++profile->win_freqs[attempt];
+#ifdef TEST_BMP_MODE
+            switch (attempt) {
+              case 0:
+                mode3_printf(erase_rect.x=(SCREEN_WIDTH-6*4)/2, 4, 0x10A5, "Genius");
+                erase_rect.width = 24;
+                break;
+              case 1:
+                mode3_printf(erase_rect.x = (SCREEN_WIDTH-11*4)/2, 4, 0x10A5, "Magnificent");
+                erase_rect.width = 44;
+                break;
+              case 2:
+                mode3_printf(erase_rect.x = (SCREEN_WIDTH-10*4)/2, 4, 0x10A5, "Impressive");
+                erase_rect.width = 40;
+                break;
+              case 3:
+                mode3_printf(erase_rect.x = (SCREEN_WIDTH-8*4)/2, 4, 0x10A5, "Splendid");
+                erase_rect.width = 32;
+                break;
+              case 4:
+                mode3_printf(erase_rect.x = (SCREEN_WIDTH-5*4)/2, 4, 0x10A5, "Great");
+                erase_rect.width = 20;
+                break;
+              case 5:
+                mode3_printf(erase_rect.x = (SCREEN_WIDTH-4*4)/2, 4, 0x10A5, "Phew");
+                erase_rect.width = 16;
+                break;
+            }
+#endif
+          }
+          ++attempt;
+        }
+      } while (0);
+    }
+  }
+#ifdef TEST_BMP_MODE
+  if (!won) {
+    mode3_printf(erase_rect.x = (SCREEN_WIDTH-44*4)/2, 4, 0x10A5, "Better luck next time! The word was: \"%s\"", word);
+    erase_rect.width = 44*4;
+  }
+#endif
+  do { 
+    vsync();
+    Poll_Keys();
+  }while (!K_STROKE(A));
+  ++profile->attempt_ct;
+#ifdef TEST_BMP_MODE
+  mode3_draw_rect(&erase_rect);
+#endif
+  return (GameOutcome_t){.won=won, .word = word};
+}
+
+void PostGame_Synopsis(const GameOutcome_t *outcome, const SaveProfile_t *profile) {
+  REG_DISPLAY_CNT = 0x0403;
+  mode3_printf((SCREEN_WIDTH-8*4)/2, 16, 0x10A5, "You %s", outcome->won?"Won!":"Lost");
+  mode3_printf((SCREEN_WIDTH-29*4)/2, 28, 0x10A5, "The correct word was: \"%s\"", outcome->word);
+  mode3_printf((SCREEN_WIDTH-14*4)/2, 40, 0x10A5, "Profile Stats:");
+
+  mode3_printf(4, 56, 0x8000, "%d Wins / %d Attempts", profile->win_ct, profile->attempt_ct);
+
+  mode3_printf(2, 66, 0x10A5, "Wins by Guess Count:");
+
+  for (int i = 0; i < 6; ++i) {
+    mode3_printf(4, 76+i*10, 0x8000, "%d-Guess Wins: %d", i+1, profile->win_freqs[i]);
   }
 
-#elif 0
-  enable_interrupts();
-  StartScreen();
-  u16 kst8;
-  while (1) {
+  mode3_printf((SCREEN_WIDTH - 33*4)/2, SCREEN_HEIGHT - 16, 0x10A5, "Press \x1b[0x2861][START]\x1b[0x10A5] to Play a New Game!");
+  do {
     vsync();
-    kst8 = Poll_Keys();
-    if (((~kst8)&0x3FF)) {
-      do vsync(); while (~Poll_Keys()&0x3FF);
-      if (!(kst8&KEY_SEL)) {
-        mode3_printf(0,8,0,"Rand yield: %08X", LFSR_Rand());
-      }
-      mode3_printf(0,0,0,"LFSR State: %08X", LFSR_DEBUGFUNC_GetState());
-    }
-  }
-  return 0;
-#else
+    Poll_Keys();
+  } while (!K_STROKE(START));
+}
+
+
+
+
+int main(void) {
   enable_interrupts();
   StartScreen();
   SaveProfile_t prof;
+  GameOutcome_t outcome;
   MainMenu(&prof);
-  
-  while (1);
-#endif
+  while (1) {
+    mode3_clear_screen();
+    fast_memset32(obj_buf, 0, sizeof(obj_buf)/4);
+    oam_cpy(OAM_MEM, obj_buf, 128);
+    outcome = PlayGame(&prof);
+    mode3_clear_screen();
+    REG_DISPLAY_CNT=0x0403;
+    mode3_printf((SCREEN_WIDTH-49*4)/2, 76, 0x0030, "Saving Data to Cartridge. Don't Power System Off.");
+    Update_Save_Profile(&prof);
+    mode3_clear_screen();
+    PostGame_Synopsis(&outcome, &prof);
+  }
+  return 0;
+
 
 }
 

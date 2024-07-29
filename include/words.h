@@ -5,7 +5,8 @@
 extern "C" {
 #endif  /* Name mangler guard */
 
-extern const char *WORDS[1379];
+#define WORD_LIST_LEN 12947
+extern __attribute__((section(".rodata"))) const char *WORDS[WORD_LIST_LEN];
 
 
 #ifdef __cplusplus

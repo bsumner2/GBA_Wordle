@@ -75,7 +75,7 @@ int Prompt_Profile_Name(char *return_buf) {
     }
     Poll_Keys();
 
-    if (!(KEY_START&KEY_CURR) && (KEY_PREV&KEY_START)) {
+    if (K_STROKE(START)) {
       if (!cursor) {
         mode3_printf((SCREEN_WIDTH-(30*4))/2, 64, 0x1CB1, "Cannot use empty profile name!");
         tmp = 60;
@@ -87,7 +87,7 @@ int Prompt_Profile_Name(char *return_buf) {
       break; 
     }
 
-    if (!(KEY_CURR&KEY_UP) && (KEY_PREV&KEY_UP)) {
+    if (K_STROKE(UP)) {
       if (0 > --row) {
         row = 2;
       } else if (row==1 && col==8) {
@@ -96,7 +96,7 @@ int Prompt_Profile_Name(char *return_buf) {
 
       kbd_cursor_moved = true;
       continue;
-    } else if (!(KEY_CURR&KEY_DOWN) && (KEY_PREV&KEY_DOWN)) {
+    } else if (K_STROKE(DOWN)) {
        if (2 < ++row) {
          row = 0;
        } else if (row==1 && col==8) {
@@ -107,13 +107,13 @@ int Prompt_Profile_Name(char *return_buf) {
        continue;
     }
     
-    if (!(KEY_CURR&KEY_LEFT) && (KEY_PREV&KEY_LEFT)) {
+    if (K_STROKE(LEFT)) {
       if (0 > --col) {
         col = row&1?7:8;
       }
       kbd_cursor_moved = true;
       continue;
-    } else if (!(KEY_CURR&KEY_RIGHT) && (KEY_PREV&KEY_RIGHT)) {
+    } else if (K_STROKE(RIGHT)) {
       if (row&1) {
         if (7 < ++col) {
           col = 0;
@@ -127,7 +127,7 @@ int Prompt_Profile_Name(char *return_buf) {
 
 
     
-    if (!(KEY_CURR&KEY_A) && (KEY_PREV&KEY_A)) {
+    if (K_STROKE(A)) {
       if (cursor+1 > 15) {
         continue;
       }
@@ -136,8 +136,9 @@ int Prompt_Profile_Name(char *return_buf) {
       tmp = ROW_START_CHARS[row] + col;
       mode3_putchar(tmp, rect.x+1, rect.y+1, 0x10A5);
       return_buf[cursor++] = tmp;
-    } else if (!(KEY_CURR&KEY_B) && (KEY_PREV&KEY_B)) {
+    } else if (K_STROKE(B)) {
       if (0 > --cursor) {
+        cursor=0;
         continue;
       }
       rect.x = name_dsp_x_off + 7*cursor;
@@ -196,7 +197,6 @@ void MainMenu(SaveProfile_t *return_loaded_pf) {
   mode3_printf((SCREEN_WIDTH-(10+len)*4)/2, 76, 0x2485, "Welcome, %s!", return_loaded_pf->name);
   len=60;
   do vsync(); while (--len);
-  mode3_clear_screen();
   return;
   
 

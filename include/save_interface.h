@@ -12,6 +12,7 @@ extern "C" {
 
 typedef struct s_save_profile {
   char name[PROF_NAME_MAX_LEN+1];
+  u32 acct_idx;
   u16 win_ct, attempt_ct;
   u16 win_freqs[6];
 } SaveProfile_t;
@@ -22,7 +23,8 @@ typedef struct s_save_profile {
  * */
 int Get_Save_Profiles(SaveProfile_t *profiles);
 
-void Add_Save_Profile(const SaveProfile_t *profile);
+void Add_Save_Profile(SaveProfile_t *profile);
+bool Update_Save_Profile(const SaveProfile_t *profile);
 
 
 #ifdef __cplusplus

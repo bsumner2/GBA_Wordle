@@ -19,7 +19,11 @@ static inline u16 Poll_Keys(void) {
   return KEY_CURR;
 }
 
+#define K_STROKE(key) Key_Pressed(KEY_##key)
 
+static inline u16 Key_Pressed(u16 key) {
+  return (!(KEY_CURR&key) && (KEY_PREV&key));
+}
 
 
 
