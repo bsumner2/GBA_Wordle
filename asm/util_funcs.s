@@ -1,12 +1,3 @@
-    .extern mode3_printf
-
-    .section .rodata
-    .align 2
-    .global TEXT_TEST
-TEXT_TEST:
-    .asciz "Rect:\n\tColor: 0x%04X\n\tLocation: (%d, %d)"
-    .size TEXT_TEST, .-TEXT_TEST
-
     .thumb_func
     .section .text
     .align 2

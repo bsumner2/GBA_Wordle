@@ -218,7 +218,7 @@ int word_diff(const char *worda, const char *wordb) {
 }
 
 
-bool recurse_search_wordlist(const char *word, const char **list, int len) {
+bool recurse_search_wordlist(const char *word, const char list[][6], int len) {
   if (len < 2) {
     if (!len) {
       return 0;
@@ -580,9 +580,6 @@ void PostGame_Synopsis(const GameOutcome_t *outcome, const SaveProfile_t *profil
     Poll_Keys();
   } while (!K_STROKE(START));
 }
-
-
-
 
 int main(void) {
   enable_interrupts();

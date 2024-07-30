@@ -9,7 +9,7 @@ extern "C" {
 
 #define ANSWER_LIST_LEN 2309
 
-extern __attribute__((section(".rodata"))) const char *ANSWERS[ANSWER_LIST_LEN];
+extern const char ANSWERS[ANSWER_LIST_LEN][6];
 
 
 #ifdef __cplusplus

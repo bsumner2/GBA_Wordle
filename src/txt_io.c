@@ -19,7 +19,7 @@ static int ipow(int base, u32 power) {
  * @brief Use after encountering escape char, ASCII(27). Advance the pointer to
  * so that it's pointing to the char immediately following the esc char.
  * */
-static u16 parse_color(char **buf_ptr, _Bool *return_errflag) {
+static u16 parse_color(char **buf_ptr, bool *return_errflag) {
   char *str = *buf_ptr;
   u16 ret = 0;
   char tmp;
@@ -70,7 +70,7 @@ int mode3_printf(int x, int y, u16 bg_clr, const char *restrict fmt, ...) {
 
   char *pstr=buf, cur;
   int x_pos=x, y_pos=y;
-  _Bool err_flag;
+  bool err_flag;
 
   while ((cur=*pstr++)) {
     if (cur < ' ') {
