@@ -18,19 +18,7 @@
 #define TILE_OFS 0
 #endif
 
-#ifdef TEST_TXT_IO
 
-int main(void) {
-  REG_DISPLAY_CNT = 0x0403;
-  memset(VRAM_BUF, 0x10A510A5, SCREEN_WIDTH*SCREEN_HEIGHT*2);
-  mode3_printf(0,0, "Hello, world! How are you doing today?");
-
-  while (1) {
-  }
-
-}
-
-#else
 
 static const char KBD_LAYOUT[] = "qwertyuiopasdfghjklzxcvbnm";
 static u8 KBD_LOCATIONS[26];
@@ -248,6 +236,8 @@ bool recurse_search_wordlist(const char *word, const char list[][6], int len) {
 
 
 int handle_kbd_events(Keyboard_Ctx_t *kbd) {
+  static char state_modifier[4];
+  static int state_mod_cur=0;
   Obj_Attrs_t *keys = kbd->keys;
   int cur_col, cur_row, new_col, new_row, tmp, ret=0, buf_cursor=kbd->buf_cursor;
   cur_col = new_col = kbd->cur_col, cur_row = new_row = kbd->cur_row;
@@ -258,7 +248,7 @@ int handle_kbd_events(Keyboard_Ctx_t *kbd) {
       LFSR_Adjust_State(*((int*)(kbd->buf)));
       return K_EV_ENTER_WORD_FAIL;
     }
-    LFSR_Adjust_State(*((int*)(kbd->buf)));
+//    LFSR_Adjust_State(*((int*)(kbd->buf)));
     return K_EV_ENTER_WORD;
   }
   if (K_STROKE(UP)) {
@@ -293,7 +283,6 @@ int handle_kbd_events(Keyboard_Ctx_t *kbd) {
     }
   }
   if (ret) {
-    // shameless hack. This could be way less spaghettified
     if (!((K_EV_MOVE_CURSOR_LEFT|K_EV_MOVE_CURSOR_RIGHT)&ret)) {
       if (new_row&2) {
         if (new_col==(KBD_ROW_LENS[2]-1)) {
@@ -337,26 +326,34 @@ int handle_kbd_events(Keyboard_Ctx_t *kbd) {
     LFSR_Adjust_State(tmp);
     return ret;
   }
-
+  
   if (K_STROKE(A)) {
     if (5 <= buf_cursor) {
-      return K_EV_ENTER_LETTER_FAIL;
+      ret = K_EV_ENTER_LETTER_FAIL;
+    } else {
+      kbd->buf[kbd->buf_cursor++] = kbd->cur_letter;
+      ret = K_EV_ENTER_LETTER;
     }
-    kbd->buf[kbd->buf_cursor++] = kbd->cur_letter;
-    return K_EV_ENTER_LETTER;
 
   } else if (K_STROKE(B)) {
     if (0 > --buf_cursor) {
-      return K_EV_DELETE_LETTER_FAIL;
+      ret = K_EV_DELETE_LETTER_FAIL;
+    } else {
+      kbd->buf[kbd->buf_cursor=buf_cursor] = 0;
+      ret = K_EV_DELETE_LETTER;
     }
-    kbd->buf[kbd->buf_cursor=buf_cursor] = 0;
-    return K_EV_DELETE_LETTER;
   }
 
-
-
-
-
+    if (ret) {
+      if (state_mod_cur >= 4) {
+        LFSR_Adjust_State(*((int*)state_modifier));
+        state_mod_cur = 0;
+        *((int*)state_modifier) = 0;
+      } else {
+        state_modifier[state_mod_cur++] = kbd->cur_letter;
+      }
+      return ret;
+    }
 
 
   
@@ -371,7 +368,7 @@ int handle_kbd_events(Keyboard_Ctx_t *kbd) {
 void MainMenu(SaveProfile_t *profile);
 
 GameOutcome_t PlayGame(SaveProfile_t *profile) {
-  char alpha_hashtable[28];
+  i8 alpha_hashtable[28];
   const char *word = NULL;
   Obj_Attrs_t *obj_ofs, *curr_tile, *key;
   u16 ev_fields, attempt=0;
@@ -435,6 +432,9 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
           break;
         } 
         if (ev_fields&K_EV_ENTER_WORD) {
+#ifdef DEBUG_FALSE_POSITIVES
+          do vsync(); while (!(REG_KEY_STAT&KEY_START));
+#endif
 #ifdef TEST_BMP_MODE
           obj_ofs = curr_tile = attempt_buf[attempt];
 #else
@@ -442,7 +442,11 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
 #endif
           won=1;
           if (NULL==word) {
+#ifdef DEBUG_FALSE_POSITIVES
+            word = "perky";
+#else
             word = ANSWERS[LFSR_Rand()%ANSWER_LIST_LEN];
+#endif
           }
 
             fast_memset32(alpha_hashtable, 0, (sizeof(alpha_hashtable)/sizeof(i32)));
@@ -455,7 +459,7 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
           //       the first T yellow and the second T green, as it should only behave this way if the word 
           //       does indeed have two T's in it.
           for (int i = 0; i < 5; ++i) {
-            if (kbd.buf[i] == word[i])
+            if ((c=kbd.buf[i]) == word[i])
               --alpha_hashtable[c-'a'];
           }
 
@@ -466,7 +470,7 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
             curr_tile->attr0.attrs.obj_mode = 0;
             if (c!=word[i]) {
               won = 0;
-              if (0 < alpha_hashtable[c-'a']) {
+              if (0 < (int)alpha_hashtable[c-'a']) {
                 --alpha_hashtable[c-'a'];
                 curr_tile->attr2.attr.palbank = 2;
                 if (c == kbd.cur_letter) {
@@ -489,7 +493,11 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
               }
               continue;
             }
-            --alpha_hashtable[c-'a'];
+#ifdef DEBUG_FALSE_POSITIVES
+            mode3_printf(0,0,0, "alpha_hashtable[c-'a'] = %d", alpha_hashtable[c-'a']);
+            do vsync(); while (REG_KEY_STAT&KEY_START);
+            mode3_clear_screen();
+#endif
             curr_tile->attr2.attr.palbank = 1;
             if (c == kbd.cur_letter) {
               kbd.cur_letter_prev_palbank = 1;
@@ -604,4 +612,3 @@ int main(void) {
 
 }
 
-#endif
