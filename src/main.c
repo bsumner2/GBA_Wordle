@@ -474,7 +474,7 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
           }
           curr_tile = OAM_MEM + (obj_ofs-obj_buf);
           for (int i = 0; i < 5; ++i) {
-            c=10;            
+            c=10;
             do vsync(); while (--c);
             spin_matrix = (Obj_Affine_t){ .pa = 256, .pb = 0, .pc = 0, .pd = 256 };
             obj_affine_cpy(AFFINE_MEM, &spin_matrix, 1);
@@ -482,15 +482,15 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
             c = obj_ofs->attr2.attr.palbank;
             obj_ofs->attr2.attr.palbank = 0;
             oam_cpy(curr_tile, obj_ofs, 1);
-            while (spin_matrix.pd != 2048) {
+            while (spin_matrix.pa != 2048) {
               vsync();
-              spin_matrix.pd += 256;
+              spin_matrix.pa += 256;
               obj_affine_cpy(AFFINE_MEM, &spin_matrix, 1);
             }
             obj_ofs->attr2.attr.palbank = c;
             oam_cpy(curr_tile, obj_ofs, 1);
-            while (spin_matrix.pd != 256) {
-              spin_matrix.pd -= 256;
+            while (spin_matrix.pa != 256) {
+              spin_matrix.pa -= 256;
               obj_affine_cpy(AFFINE_MEM, &spin_matrix, 1);
               vsync();
             }
