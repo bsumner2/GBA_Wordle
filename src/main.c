@@ -474,22 +474,33 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
           }
           curr_tile = OAM_MEM + (obj_ofs-obj_buf);
           for (int i = 0; i < 5; ++i) {
-            c=15;
+            c=10;            
             do vsync(); while (--c);
-            spin_matrix = (Obj_Affine_t){ .pa = 256, .pb = 0, .pc = 0, .pd = 4096 };
+            spin_matrix = (Obj_Affine_t){ .pa = 256, .pb = 0, .pc = 0, .pd = 256 };
             obj_affine_cpy(AFFINE_MEM, &spin_matrix, 1);
             obj_ofs->attr0.attrs.obj_mode = 1;  // switch sprite to affine mode
+            c = obj_ofs->attr2.attr.palbank;
+            obj_ofs->attr2.attr.palbank = 0;
+            oam_cpy(curr_tile, obj_ofs, 1);
+            while (spin_matrix.pd != 2048) {
+              vsync();
+              spin_matrix.pd += 256;
+              obj_affine_cpy(AFFINE_MEM, &spin_matrix, 1);
+            }
+            obj_ofs->attr2.attr.palbank = c;
             oam_cpy(curr_tile, obj_ofs, 1);
             while (spin_matrix.pd != 256) {
-              vsync();
               spin_matrix.pd -= 256;
               obj_affine_cpy(AFFINE_MEM, &spin_matrix, 1);
+              vsync();
             }
             obj_ofs->attr0.attrs.obj_mode = 0;  // switch it back to regular mode
             oam_cpy(curr_tile++, obj_ofs++, 1);
           }
           oam_cpy(OAM_MEM+60, kbd.keys, 26);
-          memset(kbd.buf, 0, sizeof(kbd.buf));
+//          memset(kbd.buf, 0, sizeof(kbd.buf));
+          *((u32*) kbd.buf) = 0;
+          *((u16*) (&kbd.buf[4])) = 0;
           kbd.buf_cursor = 0;
           if (won) {
             ++profile->win_ct;
