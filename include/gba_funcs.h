@@ -26,6 +26,12 @@ bool SRAM_Write(const void *data, size_t len, size_t ofs);
 
 void mode3_draw_rect(const BMP_Rect_t *rect);
 
+void oam_cpy(Obj_Attrs_t *dst, const Obj_Attrs_t *src, u32 ct);
+void oam_init_ofs(Obj_Attrs_t *objs, u32 ct, u32 ofs);
+void oam_init(Obj_Attrs_t *objs, u32 ct);
+void obj_affine_cpy(Obj_Affine_t *dst, const Obj_Affine_t *src, u32 ct);
+
+
 static inline void mode3_clear_screen(void) {
   fast_memset32(VRAM_BUF, 0, (SCREEN_WIDTH*SCREEN_HEIGHT)>>1);
 }

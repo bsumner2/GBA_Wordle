@@ -51,38 +51,7 @@ void enable_interrupts(void) {
 }
 
 
-void oam_cpy(Obj_Attrs_t *dst, const Obj_Attrs_t *src, u32 ct) {
-#if 1
-  while (ct--) {
-    *dst++=*src++;
-  }
-#else
-  u32 *rawd = (u32*)dst, *raws = (u32*)src;
-  while (ct--) {
-    *rawd++ = *raws++;
-    *rawd++ = *raws++;
-  }
 
-#endif
-
-}
-
-void oam_init(Obj_Attrs_t *objs, u32 ct) {
-  u32 *raw = (u32*)objs, cur = ct;
-   
-  while (cur--) {
-    *raw++ = 0x0200;
-    *raw++ = 0;
-  }
-  oam_cpy(OAM_MEM, objs, ct);
-}
-
-void oam_init_ofs(Obj_Attrs_t *objs, u32 ct, u32 ofs) {
-  u32 *raw = (u32*)objs, cur=ct;
-  while (cur--)
-    *raw++=0x0200,*raw++=0;
-  oam_cpy(&OAM_MEM[ofs], objs, ct);
-}
 
 void init_board(Obj_Attrs_t *objs) {
   int cur=0;
@@ -371,6 +340,7 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
   i8 alpha_hashtable[28];
   const char *word = NULL;
   Obj_Attrs_t *obj_ofs, *curr_tile, *key;
+  Obj_Affine_t spin_matrix;
   u16 ev_fields, attempt=0;
   bool won = 0;
   char c;
@@ -454,10 +424,7 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
               ++alpha_hashtable[word[i]-'a'];
            }
 
-          // shameless hack to make sure that duplicates dont get highlighted yellow.
-          // e.g.: if word is "BLAST", and you guess "TOAST", it wont erroneously highlight
-          //       the first T yellow and the second T green, as it should only behave this way if the word 
-          //       does indeed have two T's in it.
+
           for (int i = 0; i < 5; ++i) {
             if ((c=kbd.buf[i]) == word[i])
               --alpha_hashtable[c-'a'];
@@ -509,6 +476,16 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
           for (int i = 0; i < 5; ++i) {
             c=15;
             do vsync(); while (--c);
+            spin_matrix = (Obj_Affine_t){ .pa = 256, .pb = 0, .pc = 0, .pd = 4096 };
+            obj_affine_cpy(AFFINE_MEM, &spin_matrix, 1);
+            obj_ofs->attr0.attrs.obj_mode = 1;  // switch sprite to affine mode
+            oam_cpy(curr_tile, obj_ofs, 1);
+            while (spin_matrix.pd != 256) {
+              vsync();
+              spin_matrix.pd -= 256;
+              obj_affine_cpy(AFFINE_MEM, &spin_matrix, 1);
+            }
+            obj_ofs->attr0.attrs.obj_mode = 0;  // switch it back to regular mode
             oam_cpy(curr_tile++, obj_ofs++, 1);
           }
           oam_cpy(OAM_MEM+60, kbd.keys, 26);
@@ -611,4 +588,3 @@ int main(void) {
 
 
 }
-

@@ -50,6 +50,7 @@ extern "C" {
 #define PAL_OBJ_MEM ((u16*) (MEM_PAL + 0x0200))
 
 #define OAM_MEM ((Obj_Attrs_t*) MEM_OAM)
+#define AFFINE_MEM ((Obj_Affine_t*) MEM_OAM)
 
 #define SRAM_BUF ((u8*) (MEM_GAMEPAK_SRAM))
 
