@@ -120,13 +120,33 @@ void init_kbd(Keyboard_Ctx_t *kbd) {
 
 }
 
-
-
 void StartScreen(void) {
-  REG_DISPLAY_CNT = 0x0403;
+  Obj_Affine_t aff = {0};
+  mode3_printf((240-24*4)/2, 16, 0x8000, "A Burt Sumner Production");
+  fast_memcpy32(&TILE_MEM[5][0], WordleLettersTiles, WordleLettersTilesLen/4);
+  fast_memcpy32(PAL_OBJ_MEM, WordleLettersPal, WordleLettersPalLen/4);
   
-  mode3_printf((240-30*4)/2, 16, 0x8000, "A Burt \"Lin\" Sumner Production");
-  mode3_printf((240-18*4)/2, 48, 0x8000, "Wordle Boy Advance");
+  {
+    Obj_Attrs_t *obj = obj_buf, *oam = OAM_MEM;
+    int l2_xofs = (SCREEN_WIDTH-7*8-6)/2, l1_xofs = (SCREEN_WIDTH-6*8-5)/2;
+    for (int i = 0; i < 6; ++i) {
+      obj->attr0.raw = 36;
+      obj->attr1.raw = l1_xofs+i*9;
+      obj->attr2.attr.tile_idx = 513+"wordle"[i]-'a';
+      oam_cpy(oam++, obj++, 1);
+    }
+    for (int i = 0; i < 7; ++i) {
+      obj->attr0.raw = 52;
+      obj->attr1.raw = l2_xofs+i*9;
+      obj->attr2.attr.tile_idx = 513+"advance"[i]-'a';
+      oam_cpy(oam++, obj++, 1);
+    }
+  }
+  
+  oam_init_ofs(obj_buf+13, 128-13, 13);
+ 
+  REG_DISPLAY_CNT = 0x1403;
+//  mode3_printf((240-18*4)/2, 48, 0x8000, "Wordle Boy Advance");
   vsync();
 
   u32 rand_seed = 0;
@@ -137,9 +157,34 @@ void StartScreen(void) {
     if ((key_stat_snapshot = (~REG_KEY_STAT)&0x03FF)) {
       rand_seed ^= (rand_seed<<10) ^ key_stat_snapshot;
       if (!start_prompted) {
-          mode3_printf((SCREEN_WIDTH - 26*4)/2, SCREEN_HEIGHT - 16, 0x10A5, "[Press START to Continue!]");
-          start_prompted = 1;
-          while (!(REG_KEY_STAT&KEY_START)) vsync();
+        for (int i = 0; i < 13; ++i) {
+          vsync();
+          aff.pa = 256;
+          aff.pd = 256;
+          obj_buf[i].attr0.attrs.obj_mode = 1;  // switch it to affine mode
+          oam_cpy(&OAM_MEM[i], &obj_buf[i], 1);
+          obj_affine_cpy(AFFINE_MEM, &aff, 1);
+          while (aff.pa != 2048) {
+            vsync();
+            aff.pa += 256;
+            obj_affine_cpy(AFFINE_MEM, &aff, 1);
+          }
+          obj_buf[i].attr2.attr.palbank = 1;
+          oam_cpy(&OAM_MEM[i], &obj_buf[i], 1);
+          while (aff.pa != 256) {
+            aff.pa -= 256;
+            obj_affine_cpy(AFFINE_MEM, &aff, 1);
+            vsync();
+          }
+          obj_buf[i].attr0.attrs.obj_mode = 0;  // back to regular mode
+          oam_cpy(OAM_MEM+i, obj_buf+i, 1);
+        }
+
+        mode3_printf((SCREEN_WIDTH-39*4)/2, 68, 0x8000, 
+            "A \x1b[0x1CA2]Wordle\x1b[0x8000] \x1b[0x014F]Clone\x1b[0x8000] for the Gameboy Advance!");
+        mode3_printf((SCREEN_WIDTH - 26*4)/2, SCREEN_HEIGHT - 16, 0x10A5, "[Press START to Continue!]");
+        start_prompted = 1;
+        while (!(REG_KEY_STAT&KEY_START)) vsync();
       } else if (((KEY_START&key_stat_snapshot))) {
         break;
       } else {
@@ -596,6 +641,4 @@ int main(void) {
     PostGame_Synopsis(&outcome, &prof);
   }
   return 0;
-
-
 }

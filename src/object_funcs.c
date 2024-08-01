@@ -4,7 +4,7 @@
 
 
 void oam_cpy(Obj_Attrs_t *dst, const Obj_Attrs_t *src, u32 ct) {
-#if 1
+#if 0
   while (ct--) {
     *dst++=*src++;
   }
