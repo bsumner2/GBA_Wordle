@@ -309,4 +309,31 @@ mode3_draw_rect:
     BX r3
     .size mode3_draw_rect, .-mode3_draw_rect
 
-    
+
+
+    .thumb_func
+    .section .text
+    .align 2
+    .global Wordle_wordcmp
+    .type Wordle_wordcmp %function
+
+Wordle_wordcmp:
+    // r0 = main comparand word r1= comparand word
+    PUSH { r4 }
+    MOV r2, #0
+
+.LWordle_wordcmp_loop:
+        LDRB r3, [r0, r2]
+        LDRB r4, [r1, r2]
+        SUB r3, r3, r4
+        CMP r3, #0
+        BNE .LWordle_wordcmp_exit
+        ADD r2, #1
+        CMP r2, #5
+        BNE .LWordle_wordcmp_loop
+
+
+.LWordle_wordcmp_exit:
+    MOV r0, r3
+    POP { r4 }
+    BX lr

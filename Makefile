@@ -36,7 +36,7 @@ ARCH=-mthumb-interwork -mthumb
 IARCH=-mthumb-interwork -marm
 SPECS=-specs=gba.specs
 
-CFLAGS_BASE=-O2 -Wall -Wextra -fno-strict-aliasing -I$(INC) $(MACROS)
+CFLAGS_BASE=-O3 -Wall -Wextra -fno-strict-aliasing -I$(INC) $(MACROS)
 
 ROM_CFLAGS=$(CFLAGS_BASE) $(ARCH)
 IWRAM_CFLAGS=$(CFLAGS_BASE) $(IARCH) -mlong-calls

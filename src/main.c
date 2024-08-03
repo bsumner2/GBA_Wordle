@@ -12,11 +12,7 @@
 
 
 
-#ifdef TEST_BMP_MODE
 #define TILE_OFS 512
-#else
-#define TILE_OFS 0
-#endif
 
 
 
@@ -66,24 +62,14 @@ void init_board(Obj_Attrs_t *objs) {
     for (int j = 0; j < 5; ++j) {
       objs[cur].attr0.attrs.y=y;
       objs[cur].attr1.attrs_reg.x=x;
-#ifndef TEST_BMP_MODE
-      objs[cur].attr2.raw = (1<<10)|TILE_OFS;
-      objs[cur+30].attr0.raw = 0x0200|y;  // set hide flag and y pos.
-      objs[cur+30].attr1.attrs_reg.x=x;
-      objs[cur+++30].attr2.raw = TILE_OFS;
-#else
+
       objs[cur++].attr2.raw = TILE_OFS;
-#endif
 
       x+=9;
     }
     y+=9;
   }
-#ifdef TEST_BMP_MODE
   oam_cpy(OAM_MEM, objs, 30);
-#else
-  oam_cpy(OAM_MEM, objs, 60);
-#endif
 }
 
 
@@ -116,7 +102,7 @@ void init_kbd(Keyboard_Ctx_t *kbd) {
 
   objs[0].attr2.attr.palbank = 4;
 
-  oam_cpy(&OAM_MEM[60], objs, 26);
+  oam_cpy(&OAM_MEM[30], objs, 26);
 
 }
 
@@ -158,7 +144,8 @@ void StartScreen(void) {
       rand_seed ^= (rand_seed<<10) ^ key_stat_snapshot;
       if (!start_prompted) {
         for (int i = 0; i < 13; ++i) {
-          vsync();
+          for (key_stat_snapshot=0; ++key_stat_snapshot < 3; )  // Just recycling unused (@ least in this branch) var instead of inst'ing a new one
+            vsync();
           aff.pa = 256;
           aff.pd = 256;
           obj_buf[i].attr0.attrs.obj_mode = 1;  // switch it to affine mode
@@ -211,40 +198,28 @@ void StartScreen(void) {
 #define K_EV_ENTER_WORD          1
 #define K_EV_NO_EVENTS           0
 
-int word_diff(const char *worda, const char *wordb) {
-  int diff;
-  for (int i = 0; i < 5; ++i)
-    if ((diff=worda[i]-wordb[i]))
-      return diff;
-  return 0;
-}
+
+int Wordle_wordcmp(const char *word_a, const char *word_b);
 
 
-bool recurse_search_wordlist(const char *word, const char list[][6], int len) {
-  if (len < 2) {
-    if (!len) {
-      return 0;
+// Iterative binary search implementation
+bool search_wordlist(const char *word, const char list[][6], int len) {
+  int midpt, diff;
+  do {
+    diff = Wordle_wordcmp(word, list[(midpt=(len>>1))]);
+    if (!diff) {
+      return true;
+    } else if (diff > 0) {
+      list = &list[midpt+1];
+      len -= midpt+1;
+    } else {
+      len = midpt;
     }
-    return !strcmp(word, list[0]);
-  }
+  } while (len > 1);
+  return len ? !Wordle_wordcmp(word, list[0]) : false;
+} 
 
-  const int midpt = len>>1;
-
-
-  int diff;
-  diff = word_diff(word, list[midpt]);
-  if (!diff) {
-    return 1;
-  } else if (diff > 0) {
-    return recurse_search_wordlist(word, &list[midpt+1], len-midpt-1);
-  } else {
-    return recurse_search_wordlist(word, list, midpt);
-  }
-
-}
-
-#define SEARCH_WORDLIST(word) recurse_search_wordlist(word, WORDS, WORD_LIST_LEN)
-
+#define SEARCH_WORDLIST(word) search_wordlist(word, WORDS, WORD_LIST_LEN)
 
 
 
@@ -323,14 +298,14 @@ int handle_kbd_events(Keyboard_Ctx_t *kbd) {
       tmp += KBD_ROW_LENS[i];
     tmp+=cur_col;
     keys[tmp].attr2.attr.palbank = kbd->cur_letter_prev_palbank;
-    oam_cpy(OAM_MEM + 60 + tmp, keys + tmp, 1);
+    oam_cpy(OAM_MEM + 30 + tmp, keys + tmp, 1);
     tmp = 0;
     for (int i = 0; i < new_row; ++i)
       tmp+=KBD_ROW_LENS[i];
     tmp+=new_col;
     kbd->cur_letter_prev_palbank = keys[tmp].attr2.attr.palbank;
     keys[tmp].attr2.attr.palbank = KEY_HOVER_PALBANK;
-    oam_cpy(OAM_MEM + 60 + tmp, keys + tmp, 1);
+    oam_cpy(OAM_MEM + 30 + tmp, keys + tmp, 1);
     kbd->cur_row = new_row;
     kbd->cur_col = new_col;
     kbd->cur_letter = tmp = kbd->letters[new_row][new_col];
@@ -389,28 +364,20 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
   u16 ev_fields, attempt=0;
   bool won = 0;
   char c;
-#ifdef TEST_BMP_MODE
   fast_memcpy32(&TILE_MEM[5][0], WordleLettersTiles, WordleLettersTilesLen/4);
-#else
-  fast_memcpy32(&TILE_MEM[4][0], WordleLettersTiles, WordleLettersTilesLen/4);
-#endif
   fast_memcpy32(PAL_OBJ_MEM, WordleLettersPal, WordleLettersPalLen/4);
   
   init_board(obj_buf);
   Keyboard_Ctx_t kbd = {0};
-  kbd.keys = &obj_buf[60];
+  kbd.keys = &obj_buf[30];
   kbd.cur_letter = 'q';
 
   init_kbd(&kbd);
-  oam_init_ofs(&obj_buf[86], 128-86, 86);
+  oam_init_ofs(&obj_buf[56], 128-56, 56);
 
-#ifdef TEST_BMP_MODE
   REG_DISPLAY_CNT = 0x1403;
   BMP_Rect_t erase_rect = {.x = (SCREEN_WIDTH-30*4)/2, .y=4, .width = 30*4, .height = 8, .color = 0 };
   int message_erase_timer;
-#else
-  REG_DISPLAY_CNT = 0x1000;
-#endif
   while (!won && attempt < 6) {
     vsync();
     Poll_Keys();
@@ -418,7 +385,6 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
       do {
         // poor man's try catch lol
         if (ev_fields&(K_EV_DELETE_LETTER_FAIL|K_EV_ENTER_LETTER_FAIL|K_EV_ENTER_WORD_FAIL)) {
-#ifdef TEST_BMP_MODE
           if (ev_fields&K_EV_ENTER_WORD_FAIL) {
             message_erase_timer = 60;
             if (kbd.buf_cursor!=5) {
@@ -432,7 +398,6 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
             } while (--message_erase_timer && !K_STROKE(A));
             mode3_draw_rect(&erase_rect);
           }
-#endif
 
           break;
         }
@@ -450,11 +415,7 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
 #ifdef DEBUG_FALSE_POSITIVES
           do vsync(); while (!(REG_KEY_STAT&KEY_START));
 #endif
-#ifdef TEST_BMP_MODE
           obj_ofs = curr_tile = attempt_buf[attempt];
-#else
-          obj_ofs = curr_tile = obj_buf + 30 + attempt*5;
-#endif
           won=1;
           if (NULL==word) {
 #ifdef DEBUG_FALSE_POSITIVES
@@ -542,7 +503,7 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
             obj_ofs->attr0.attrs.obj_mode = 0;  // switch it back to regular mode
             oam_cpy(curr_tile++, obj_ofs++, 1);
           }
-          oam_cpy(OAM_MEM+60, kbd.keys, 26);
+          oam_cpy(OAM_MEM+30, kbd.keys, 26);
 //          memset(kbd.buf, 0, sizeof(kbd.buf));
           *((u32*) kbd.buf) = 0;
           *((u16*) (&kbd.buf[4])) = 0;
@@ -550,7 +511,6 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
           if (won) {
             ++profile->win_ct;
             ++profile->win_freqs[attempt];
-#ifdef TEST_BMP_MODE
             switch (attempt) {
               case 0:
                 mode3_printf(erase_rect.x=(SCREEN_WIDTH-6*4)/2, 4, 0x10A5, "Genius");
@@ -577,27 +537,22 @@ GameOutcome_t PlayGame(SaveProfile_t *profile) {
                 erase_rect.width = 16;
                 break;
             }
-#endif
           }
           ++attempt;
         }
       } while (0);
     }
   }
-#ifdef TEST_BMP_MODE
   if (!won) {
     mode3_printf(erase_rect.x = (SCREEN_WIDTH-44*4)/2, 4, 0x10A5, "Better luck next time! The word was: \"%s\"", word);
     erase_rect.width = 44*4;
   }
-#endif
   do { 
     vsync();
     Poll_Keys();
   }while (!K_STROKE(A));
   ++profile->attempt_ct;
-#ifdef TEST_BMP_MODE
   mode3_draw_rect(&erase_rect);
-#endif
   return (GameOutcome_t){.won=won, .word = word};
 }
 

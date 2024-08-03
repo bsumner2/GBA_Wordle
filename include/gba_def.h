@@ -55,6 +55,12 @@ extern "C" {
 #define SRAM_BUF ((u8*) (MEM_GAMEPAK_SRAM))
 
 
+#define OBJ_MODE_REGULAR 0
+#define OBJ_MODE_AFFINE 1
+#define OBJ_MODE_HIDE 2
+#define OBJ_MODE_AFFINE_X2RENDERING 3
+
+
 #ifdef __cplusplus
 }
 #endif
