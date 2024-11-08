@@ -1,7 +1,0 @@
-/home/burton/dev/c/gba/GBA_Wordle/build/CMakeFiles/rom_c_sources.dir
-/home/burton/dev/c/gba/GBA_Wordle/build/CMakeFiles/asm_sources.dir
-/home/burton/dev/c/gba/GBA_Wordle/build/CMakeFiles/GBA_Homebrew_Project.elf.dir
-/home/burton/dev/c/gba/GBA_Wordle/build/CMakeFiles/test.dir
-/home/burton/dev/c/gba/GBA_Wordle/build/CMakeFiles/cleanup.dir
-/home/burton/dev/c/gba/GBA_Wordle/build/CMakeFiles/edit_cache.dir
-/home/burton/dev/c/gba/GBA_Wordle/build/CMakeFiles/rebuild_cache.dir
