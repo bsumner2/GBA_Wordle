@@ -1,0 +1,36 @@
+CMakeFiles/rom_c_sources.dir/src/menu.c.o: \
+ /home/burton/dev/c/gba/GBA_Wordle/src/menu.c \
+ /home/burton/dev/c/gba/GBA_Wordle/include/gba_types.h \
+ /home/burton/dev/c/gba/GBA_Wordle/include/gba_util_macros.h \
+ /opt/devkitpro/devkitARM/lib/gcc/arm-none-eabi/14.2.0/include/stdint.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/stdint.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/machine/_default_types.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/sys/features.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/_newlib_version.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/sys/_intsup.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/sys/_stdint.h \
+ /opt/devkitpro/devkitARM/lib/gcc/arm-none-eabi/14.2.0/include/stdbool.h \
+ /home/burton/dev/c/gba/GBA_Wordle/include/gba_util_macros.h \
+ /home/burton/dev/c/gba/GBA_Wordle/include/gba_def.h \
+ /home/burton/dev/c/gba/GBA_Wordle/include/gba_types.h \
+ /home/burton/dev/c/gba/GBA_Wordle/include/gba_funcs.h \
+ /home/burton/dev/c/gba/GBA_Wordle/include/gba_def.h \
+ /opt/devkitpro/devkitARM/lib/gcc/arm-none-eabi/14.2.0/include/stddef.h \
+ /home/burton/dev/c/gba/GBA_Wordle/include/input.h \
+ /home/burton/dev/c/gba/GBA_Wordle/include/rng.h \
+ /home/burton/dev/c/gba/GBA_Wordle/include/mode3_io.h \
+ /home/burton/dev/c/gba/GBA_Wordle/include/save_interface.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/string.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/_ansi.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/newlib.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/sys/config.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/machine/ieeefp.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/sys/reent.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/_ansi.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/sys/cdefs.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/sys/_types.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/machine/_types.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/sys/lock.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/sys/_locale.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/strings.h \
+ /opt/devkitpro/devkitARM/arm-none-eabi/include/sys/string.h
