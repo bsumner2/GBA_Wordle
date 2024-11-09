@@ -1,7 +1,7 @@
 
 # Minimum CMake version and project setup
 cmake_minimum_required(VERSION 3.10)
-project(GBA_Homebrew_Project C CXX ASM)
+project(GBA_Wordle C CXX ASM)
 
 # Define directories
 set(SRC_DIR ${CMAKE_SOURCE_DIR}/src)
