@@ -8,6 +8,8 @@
 #include "wordle_letters.h"
 #include "words.h"
 #include "answers.h"
+#include "wordlist.h"
+#include "answerlist.h"
 #include <string.h>
 
 
@@ -577,12 +579,19 @@ void PostGame_Synopsis(const GameOutcome_t *outcome, const SaveProfile_t *profil
   } while (!K_STROKE(START));
 }
 
+__attribute__ ((naked)) STAT_INLN void Huffman_Decompress(const void *data_with_header, void *dest_decompression_buffer) {
+  __asm volatile ( "SVC 0x13\n\t"
+      "BX lr" );
+}
+
 int main(void) {
   enable_interrupts();
   StartScreen();
   SaveProfile_t prof;
   GameOutcome_t outcome;
   MainMenu(&prof);
+  Huffman_Decompress(answerlist_Huffman_Compression_Data, (void*)ANSWERS);
+  Huffman_Decompress(wordlist_Huffman_Compression_Data, (void*)WORDS);
   while (1) {
     mode3_clear_screen();
     fast_memset32(obj_buf, 0, sizeof(obj_buf)/4);
