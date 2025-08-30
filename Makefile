@@ -80,9 +80,8 @@ GASFLAGS=-g -xassembler-with-cpp -I$(INC)
 .SILENT:
 
 debug: clean gbuild
-#	$(MGBA) -g $(BIN)/$(TARGET).debug.elf &
-#	$(DB) $(BIN)/$(TARGET).debug.elf -ex 'target remote $(IP):2345'
-	echo 'target remote $(IP):2345'
+	$(MGBA) -g $(BIN)/$(TARGET).debug.elf &
+	$(DB) $(BIN)/$(TARGET).debug.elf -ex 'target remote $(IP):2345'
 
 test: clean build
 	$(MGBA) $(BIN)/$(TARGET).gba
