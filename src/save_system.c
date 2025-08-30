@@ -13,7 +13,7 @@ typedef struct s_save_header {
   u32 profile_count;
 } SaveHeaderFields_t;
 
-#define SAVE_PROFILES_OFS 32
+#define SAVE_PROFILES_OFS sizeof(SaveProfile_t)
 
 
 

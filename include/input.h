@@ -21,7 +21,7 @@ static inline u16 Poll_Keys(void) {
 
 #define K_STROKE(key) Key_Pressed(KEY_##key)
 
-static inline u16 Key_Pressed(u16 key) {
+static inline bool Key_Pressed(u16 key) {
   return (!(KEY_CURR&key) && (KEY_PREV&key));
 }
 

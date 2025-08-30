@@ -7,7 +7,7 @@ extern "C" {
 #define restrict
 #endif
 
-int mode3_printf(int x, int y, unsigned short bg_clr, const char *restrict fmt, ...);
+__attribute__ ((__format__ (__printf__, 4, 5))) int mode3_printf(int x, int y, unsigned short bg_clr, const char *restrict fmt, ...);
 
 void mode3_putchar(int c, int x, int y, unsigned short bg_color);
 

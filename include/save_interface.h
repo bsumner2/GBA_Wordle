@@ -13,9 +13,12 @@ extern "C" {
 typedef struct s_save_profile {
   char name[PROF_NAME_MAX_LEN+1];
   u32 acct_idx;
+  u32 rand_state;
   u16 win_ct, attempt_ct;
   u16 win_freqs[6];
+  u64 ALIGN;
 } SaveProfile_t;
+
 
 /**
  * @brief Populates buff provided in param 0 with save profiles

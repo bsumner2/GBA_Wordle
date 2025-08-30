@@ -79,12 +79,12 @@ GASFLAGS=-g -xassembler-with-cpp -I$(INC)
 
 .SILENT:
 
+test: clean build
+	$(MGBA) $(BIN)/$(TARGET).gba
+
 debug: clean gbuild
 	$(MGBA) -g $(BIN)/$(TARGET).debug.elf &
 	$(DB) $(BIN)/$(TARGET).debug.elf -ex 'target remote $(IP):2345'
-
-test: clean build
-	$(MGBA) $(BIN)/$(TARGET).gba
 
 gbuild: $(IWRAM_SRC) $(SRC) $(BIN) $(TARGET).debug.elf
 

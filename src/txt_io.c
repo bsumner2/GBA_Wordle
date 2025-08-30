@@ -50,7 +50,7 @@ static u16 parse_color(char **buf_ptr, bool *return_errflag) {
 }
 
 
-int mode3_printf(int x, int y, u16 bg_clr, const char *restrict fmt, ...) {
+__attribute__ ((__format__ (__printf__, 4, 5))) int mode3_printf(int x, int y, u16 bg_clr, const char *restrict fmt, ...) {
   BMP_Rect_t tabrect = {
     .x=0,.y=0,.width=SubPixel_Glyph_Width*4, .height=SubPixel_Glyph_Height
   };

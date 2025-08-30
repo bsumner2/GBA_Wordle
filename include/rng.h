@@ -15,7 +15,8 @@ void LFSR_Shift(void);
 u32 LFSR_Rand(void);
 u32 LFSR_Adjust_State(u32 adjustor);
 void LFSR_Set_State_Adjustor_Callback(LFSR_State_Adjust_Callback_t adjustor_callback);
-u32 LFSR_DEBUGFUNC_GetState(void);
+void LFSR_SRand(u32 seed);
+u32 LFSR_GetState(void);
 
 #ifdef __cplusplus
 }

@@ -590,6 +590,7 @@ int main(void) {
   SaveProfile_t prof;
   GameOutcome_t outcome;
   MainMenu(&prof);
+  LFSR_SRand(prof.rand_state);
   Huffman_Decompress(answerlist_Huffman_Compression_Data, (void*)ANSWERS);
   Huffman_Decompress(wordlist_Huffman_Compression_Data, (void*)WORDS);
   while (1) {
@@ -599,6 +600,7 @@ int main(void) {
     outcome = PlayGame(&prof);
     mode3_clear_screen();
     REG_DISPLAY_CNT=0x0403;
+    prof.rand_state = LFSR_GetState();
     mode3_printf((SCREEN_WIDTH-49*4)/2, 76, 0x0030, "Saving Data to Cartridge. Don't Power System Off.");
     Update_Save_Profile(&prof);
     mode3_clear_screen();

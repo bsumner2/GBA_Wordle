@@ -15,7 +15,7 @@ static u32 xor_and_swap_hword_sigs(u32 a, u32 b) {
 
 static LFSR_State_Adjust_Callback_t adj_cb;
 
-u32 LFSR_DEBUGFUNC_GetState(void) {return LFSR_Main_Context.state;}
+u32 LFSR_GetState(void) {return LFSR_Main_Context.state;}
 
 void LFSR_Init(u32 seed, u32 feedback_poly_ini[FEEDBACK_POLY_DEGREE]) {
   LFSR_Main_Context.state = seed;
@@ -23,6 +23,8 @@ void LFSR_Init(u32 seed, u32 feedback_poly_ini[FEEDBACK_POLY_DEGREE]) {
     LFSR_Main_Context.feedback_polynomial[i] = feedback_poly_ini[i];
   LFSR_Set_State_Adjustor_Callback(NULL);
 }
+
+void LFSR_SRand(u32 seed) { LFSR_Main_Context.state = seed; }
 
 void LFSR_Shift(void) {
   u32 fbb = 0;
@@ -46,8 +48,6 @@ u32 LFSR_Adjust_State(u32 adjustor) {
 
 
 u32 LFSR_Rand(void) {
-  u32 ret = LFSR_Main_Context.state;
-
   LFSR_Shift();
-  return ret;
+  return LFSR_Main_Context.state;
 }
