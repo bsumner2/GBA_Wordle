@@ -18,21 +18,21 @@ compression tools, which you can see [here](https://github.com/bsumner2/GBA_Tool
   on all authentic GBAs. You can find the command line tool at my [GBA Tools repo](https://github.com/bsumner2/GBA_Tools)
   here on github!
 
-## Build ROM
+## Makefile Targets
+
+Foreword: so originally, I used Makefile for build sys, but then switched to CMake, but then I realized CMake was overly convoluting the build process, so I've since switched to Make. I apologize for the back and forth there!
+
+### Build ROM
 
 ```shell
-mkdir build ; cd build
-cmake ..
-cmake --build .
+make build
 ```
 
-## Build ROM and Test ROM with mgba-qt
-
+### Test ROM
 ```shell
-mkdir build ; cd build
-cmake ..
-cmake --build . --target test
+make test
 ```
+
 
 ## Special Thanks To Arjun Vikram
 
